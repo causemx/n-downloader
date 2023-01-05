@@ -9,17 +9,22 @@ class Novel:
         self.novel_token = novel_token
         self.novel_id = novel_id
         self.base_url = base_url
+        self.name = ""
         self.loaded = False
+        self.chapters = []
 
 
     async def load_catalog(self, session):
         url = self.get_url()
         html = await fetch_text_ensure(session, url)
         doc = parse_html(html)
-        chapters = doc.findall('.//a[@class="chapter-li-a "]')
-        chapter_urls = ['{}{}'.format(self.base_url, chapter.attrib['href']) for chapter in chapters]
-        entry_pages = [Chapter.from_url(cu) for cu in chapter_urls]
-        await entry_pages[0].load(session)
+        cpts = doc.findall('.//a[@class="chapter-li-a "]')
+        cpt_urls = ['{}{}'.format(self.base_url, cpt.attrib['href']) for cpt in cpts]
+        self.chapters = chapters = [Chapter.from_url(entry) for entry in cpt_urls]
+        self.loaded = True
+        for chapter in chapters:
+            await chapter.load(session)
+        # await entry_pages[0].load(session)
         
 
     def get_url(self):
@@ -42,22 +47,40 @@ class Novel:
 class Chapter:
     def __init__(self, entry_url):
         self.entry_url = entry_url
+        self.pages = []
 
     async def load(self, session):
         url = self.entry_url
         html = await fetch_text_ensure(session, url)
         doc = parse_html(html)
         js_tags = doc.findall('.//script[@type="text/javascript"]')
+        
         for js in js_tags:
-            self.get_page_params(js.text)
-            
-
-    def get_page_params(self, params_text):
-        if params_text is None or not params_text.startswith('var ReadParams'):
-            return
-        params = dict(re.findall(r"(\w+):'(.+?)'", params_text))
-        print(params['url_image'])
+            if js.text is not None and js.text.startswith('var ReadParams'):
+                params = dict(re.findall(r"(\w+):'(.+?)'", js.text))
+                page = ChapterPage.from_params(params)
+                self.pages.append(page)
+        
+        for page in self.pages:
+            print('{}{}'.format(page.url_home, page.url_next))
 
     @staticmethod
     def from_url(url):
         return Chapter(url)
+
+class ChapterPage:
+    def __init__(self, articleid, page, url_previous, url_next, url_home) -> None:
+        self.articleid = articleid
+        self.page = page
+        self.url_previous = url_previous
+        self.url_next = url_next
+        self.url_home = url_home
+    
+    @staticmethod
+    def from_params(params):
+        return ChapterPage(
+            params['articleid'], 
+            params['page'], 
+            params['url_previous'], 
+            params['url_next'], 
+            params['url_home'],)

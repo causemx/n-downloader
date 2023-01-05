@@ -73,7 +73,6 @@ async def fetch_text(session, url, timeout=10.0, encoding=None, **kwargs):
                     data += chunk
                     chunk = await r.content.read(DATA_CHUNK_SIZE)
     except Exception as e:
-        print("error:", str(e))
         raise ValueError('Can not read data from content')
 
     content_type = r.headers.get('Content-Type', '')
