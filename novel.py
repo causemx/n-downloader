@@ -21,6 +21,7 @@ class Novel:
         cpts = doc.findall('.//a[@class="chapter-li-a "]')
         cpt_urls = ['{}{}'.format(self.base_url, cpt.attrib['href']) for cpt in cpts]
         self.chapters = chapters = [Chapter.from_url(entry) for entry in cpt_urls]
+        
         self.loaded = True
         for chapter in chapters:
             await chapter.load(session)
@@ -62,7 +63,11 @@ class Chapter:
                 self.pages.append(page)
         
         for page in self.pages:
-            print('{}{}'.format(page.url_home, page.url_next))
+            url = '{}{}'.format(page.url_home, page.url_next)
+            await page.get_pages(session, url)
+        
+        
+            #print('{}{}'.format(page.url_home, page.url_next))
 
     @staticmethod
     def from_url(url):
@@ -75,7 +80,20 @@ class ChapterPage:
         self.url_previous = url_previous
         self.url_next = url_next
         self.url_home = url_home
+        self.ref_url = []
     
+    async def get_pages(self, session, url):
+        print('chapter_page: start get_pages:{}'.format(url))
+        self.ref_url.append(url)
+
+        for i in range(10):
+            curr_url = '{}_{}'.format(url, i)
+            html = await fetch_text_ensure(session, curr_url)
+            doc = parse_html(html)
+            ret = doc.find('.//div[@id="acontent"]/p')
+            if ret is not None:
+                self.ref_url.append(curr_url)
+
     @staticmethod
     def from_params(params):
         return ChapterPage(
