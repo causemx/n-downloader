@@ -19,13 +19,16 @@ class Novel:
         html = await fetch_text_ensure(session, url)
         doc = parse_html(html)
         cpts = doc.findall('.//a[@class="chapter-li-a "]')
-        cpt_urls = ['{}{}'.format(self.base_url, cpt.attrib['href']) for cpt in cpts]
+        cpt_urls = []
+        for cpt in cpts:
+            if cpt.attrib['href'] != 'javascript:cid(0)':
+                cpt_urls.append('{}{}'.format(self.base_url, cpt.attrib['href']))
+
         self.chapters = chapters = [Chapter.from_url(entry) for entry in cpt_urls]
-        
         self.loaded = True
         for chapter in chapters:
             await chapter.load(session)
-        # await entry_pages[0].load(session)
+        await entry_pages[0].load(session)
         
 
     def get_url(self):
@@ -63,41 +66,44 @@ class Chapter:
                 self.pages.append(page)
         
         for page in self.pages:
-            url = '{}{}'.format(page.url_home, page.url_next)
+            url = '{}{}/{}/{}.html'.format(page.url_home, \
+                "novel", page.articleid, page.chapterid)
             await page.get_pages(session, url)
-        
-        
-            #print('{}{}'.format(page.url_home, page.url_next))
 
     @staticmethod
     def from_url(url):
         return Chapter(url)
 
 class ChapterPage:
-    def __init__(self, articleid, page, url_previous, url_next, url_home) -> None:
+    def __init__(self, articleid, chapterid, page, url_previous, url_next, url_home) -> None:
         self.articleid = articleid
+        self.chapterid = chapterid
         self.page = page
         self.url_previous = url_previous
         self.url_next = url_next
         self.url_home = url_home
-        self.ref_url = []
+        self.ref_urls = []
     
     async def get_pages(self, session, url):
-        print('chapter_page: start get_pages:{}'.format(url))
-        self.ref_url.append(url)
+        #print('chapter_page: start get_pages:{}'.format(url))
+        self.ref_urls.append(url)
 
-        for i in range(10):
-            curr_url = '{}_{}'.format(url, i)
+        for i in range(5):
+            curr_url = '{}_{}.html'.format(url[:-5], i+1)
             html = await fetch_text_ensure(session, curr_url)
             doc = parse_html(html)
             ret = doc.find('.//div[@id="acontent"]/p')
-            if ret is not None:
-                self.ref_url.append(curr_url)
+            try:
+                if ret.text:
+                    self.ref_urls.append(curr_url)
+            except AttributeError as e:
+                pass
 
     @staticmethod
     def from_params(params):
         return ChapterPage(
             params['articleid'], 
+            params['chapterid'],
             params['page'], 
             params['url_previous'], 
             params['url_next'], 

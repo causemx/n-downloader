@@ -29,7 +29,7 @@ async def check_none_page(url):
             html = await r.text()
             doc = parse_html(html)
             foo = doc.find('.//div[@id="acontent"]/p')
-            if foo.text is None:
+            if not foo.text:
                 print('none')
 
 def main():
