@@ -28,7 +28,6 @@ class Novel:
         self.loaded = True
         for chapter in chapters:
             await chapter.load(session)
-        await entry_pages[0].load(session)
         
 
     def get_url(self):
@@ -69,6 +68,10 @@ class Chapter:
             url = '{}{}/{}/{}.html'.format(page.url_home, \
                 "novel", page.articleid, page.chapterid)
             await page.get_pages(session, url)
+        
+        for page in self.pages:
+            for url in page.ref_urls:
+                await page.download_page(session, url)
 
     @staticmethod
     def from_url(url):
@@ -98,6 +101,23 @@ class ChapterPage:
                     self.ref_urls.append(curr_url)
             except AttributeError as e:
                 pass
+
+    async def download_page(self, session, url):
+        html = await fetch_text_ensure(session, url)
+        doc = parse_html(html)
+
+        f = open("novel.txt", "a+")
+        
+        hs = doc.find('.//div[@class="atitle"]/h1')
+        hss = doc.find('.//div[@class="atitle"]/h3')
+        f.write(hs.text)
+        f.write(hss.text)
+        ps = doc.findall('.//div[@id="acontent"]/p')
+        for p in ps:
+            if p.text:
+                f.write(p.text)
+        f.write("\n")
+        f.close()
 
     @staticmethod
     def from_params(params):
