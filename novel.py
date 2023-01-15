@@ -26,8 +26,9 @@ class Novel:
 
         self.chapters = chapters = [Chapter.from_url(entry) for entry in cpt_urls]
         self.loaded = True
-        for chapter in chapters:
-            await chapter.load(session)
+
+        '''for chapter in chapters:
+            await chapter.load(session)'''
         
 
     def get_url(self):
@@ -50,28 +51,28 @@ class Novel:
 class Chapter:
     def __init__(self, entry_url):
         self.entry_url = entry_url
-        self.pages = []
+        self.first_page = None
 
     async def load(self, session):
-        url = self.entry_url
-        html = await fetch_text_ensure(session, url)
+        html = await fetch_text_ensure(session, self.entry_url)
         doc = parse_html(html)
         js_tags = doc.findall('.//script[@type="text/javascript"]')
         
-        for js in js_tags:
+        params = self.get_params(js_tags)
+        if params:
+            self.first_page = first_page = ChapterPage.from_params(params)
+
+        urls = await first_page.get_pages(session)
+        
+        for url in urls:
+            await first_page.download_page(session, url)
+
+    def get_params(self, jss):
+        for js in jss:
             if js.text is not None and js.text.startswith('var ReadParams'):
                 params = dict(re.findall(r"(\w+):'(.+?)'", js.text))
-                page = ChapterPage.from_params(params)
-                self.pages.append(page)
-        
-        for page in self.pages:
-            url = '{}{}/{}/{}.html'.format(page.url_home, \
-                "novel", page.articleid, page.chapterid)
-            await page.get_pages(session, url)
-        
-        for page in self.pages:
-            for url in page.ref_urls:
-                await page.download_page(session, url)
+                return params
+        return None
 
     @staticmethod
     def from_url(url):
@@ -85,12 +86,13 @@ class ChapterPage:
         self.url_previous = url_previous
         self.url_next = url_next
         self.url_home = url_home
-        self.ref_urls = []
+        
     
-    async def get_pages(self, session, url):
+    async def get_pages(self, session):
         #print('chapter_page: start get_pages:{}'.format(url))
-        self.ref_urls.append(url)
-
+        ref_urls = []
+        url = '{}{}/{}/{}.html'.format(self.url_home, "novel", self.articleid, self.chapterid)
+        ref_urls.append(url)
         for i in range(5):
             curr_url = '{}_{}.html'.format(url[:-5], i+1)
             html = await fetch_text_ensure(session, curr_url)
@@ -98,9 +100,10 @@ class ChapterPage:
             ret = doc.find('.//div[@id="acontent"]/p')
             try:
                 if ret.text:
-                    self.ref_urls.append(curr_url)
+                    ref_urls.append(curr_url)
             except AttributeError as e:
                 pass
+        return ref_urls
 
     async def download_page(self, session, url):
         html = await fetch_text_ensure(session, url)
@@ -111,13 +114,21 @@ class ChapterPage:
         hs = doc.find('.//div[@class="atitle"]/h1')
         hss = doc.find('.//div[@class="atitle"]/h3')
         f.write(hs.text)
+        f.write("\n")
         f.write(hss.text)
+        f.write("\n")
         ps = doc.findall('.//div[@id="acontent"]/p')
         for p in ps:
             if p.text:
                 f.write(p.text)
         f.write("\n")
         f.close()
+
+    @staticmethod
+    def get_url(page):
+        url = '{}{}/{}/{}.html'.format(page.url_home, \
+                "novel", page.articleid, page.chapterid)
+        return url
 
     @staticmethod
     def from_params(params):

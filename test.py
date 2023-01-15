@@ -17,11 +17,12 @@ async def read(url):
         async with session.get(url) as r:
             html = await r.text()
             doc = parse_html(html)
-            foo = doc.find('.//a[@onclick="window.location.href = ReadParams.url_next;"]')
-            if foo.text == "下一章":
-                print('final')
-            if foo.text == "下一頁":
-                print('not end')
+            for d in doc.iter('li'):
+                if d.text:
+                    print(d.text)
+                else:
+                    a = d.find('.//a[@class="chapter-li-a "]')
+                    print(a.attrib['href'])
             
 async def check_none_page(url):
     async with aiohttp.ClientSession() as session:
@@ -51,7 +52,7 @@ async def write_content(url):
 
 def main():
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(write_content('https://tw.linovelib.com/novel/2547/92960_3.html'))
+    loop.run_until_complete(read('https://tw.linovelib.com/novel/2547/catalog'))
 
 if __name__ == "__main__":
     main()

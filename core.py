@@ -1,9 +1,20 @@
 import asyncio
 import aiohttp
+import logging
+import traceback
+logger = logging.getLogger('n-downloader')
 
 from novel import Novel
 
 
+async def do_forever(job):
+    while True:
+        try:
+            await job()
+        except asyncio.CancelledError:
+            break
+        except:
+            logger.error(traceback.format_exc())
 
 class Downloader:
     def __init__(self, session, novel_url):
@@ -11,42 +22,30 @@ class Downloader:
         self.novel = Novel.from_url(novel_url)
 
         self.planned_chapters = asyncio.queues.Queue()
-        self.unloaded_chapters = asyncio.queues.Queue()
+        # self.unloaded_pages = asyncio.queues.Queue()
     
     async def get_chapt(self):
-        chapter_url = await self.planned_chapters.get()
-        raw  = await fetch_text_ensure(self.session, chapter_url)
-        print(raw)
+        chapter = await self.planned_chapters.get()
+        await chapter.load(self.session)
         self.planned_chapters.task_done()
 
-    async def make_dive(self, url):
-        raw = await fetch_text_ensure(self.session, url)
-        print(raw)
-
-        #print(doc.findall('.//div[@id="gdn"]/a').text)
+    async def start(self):
+        if not self.novel.loaded:
+            await self.novel.load_catalog(self.session)
         
-        """
-        async with session.get(url) as response:
-            if response.status == 200:
-                return await response.json()
-            elif attempt < 3:
-                print(f'failed #{attempt}')  # to debug, remove later
-                return await make_request(session, url, attempt + 1)
-        return None
-        """
-
-
-    async def start(self, session, cata_url):
-        raw = await fetch_text_ensure(session, cata_url)
-        doc = parse_html(raw)
-        chapters = doc.findall('.//a[@class="chapter-li-a "]')
-        for chapter in chapters:
-            chapt_url = '{}{}'.format(self.base_url, chapter.attrib['href'])
-            await self.planned_chapters.put(chapt_url)
+        for chapter in self.novel.chapters:
+            await self.planned_chapters.put(chapter)
         
         self.workers = workers = [asyncio.ensure_future(do_forever(self.get_chapt))]
-        #workers += [asyncio.ensure_future(do_forever(self.load_chapt))]
+        #workers += [asyncio.ensure_future(do_forever(self.load_page))]
+
+    async def join(self):
+        await self.planned_chapters.join()
+        #while self.unloaded_pages.qsize() != 0 or self.unloaded_pages._unfinished_tasks != 0:
+         #   await self.unloaded_pages.join()
 
 async def download(*args, **kwargs):
     downloader = Downloader(*args, **kwargs)
-    await downloader.novel.load_catalog(downloader.session)
+    await downloader.start()
+    await downloader.join()
+    #await downloader.novel.load_catalog(downloader.session)
