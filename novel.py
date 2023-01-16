@@ -13,18 +13,30 @@ class Novel:
         self.loaded = False
         self.chapters = []
 
-
     async def load_catalog(self, session):
+
+        def convert(list):
+            return tuple(i for i in list)
+
         url = self.get_url()
         html = await fetch_text_ensure(session, url)
         doc = parse_html(html)
-        cpts = doc.findall('.//a[@class="chapter-li-a "]')
-        cpt_urls = []
-        for cpt in cpts:
-            if cpt.attrib['href'] != 'javascript:cid(0)':
-                cpt_urls.append('{}{}'.format(self.base_url, cpt.attrib['href']))
 
-        self.chapters = chapters = [Chapter.from_url(entry) for entry in cpt_urls]
+        entries = []
+        page_count = 0
+
+        for d in doc.iter('li'):
+            if d.text:
+                if len(entries) != 0:
+                    self.chapters.append(Chapter(d.text, convert(entries), page_count))
+                    entries.clear()
+                    page_count = 0
+            else:
+                a = d.find('.//a[@class="chapter-li-a "]')
+                if a.attrib['href'] != 'javascript:cid(0)':
+                    entries.append('{}{}'.format(self.base_url, a.attrib['href']))
+                    page_count = page_count + 1
+
         self.loaded = True
 
         '''for chapter in chapters:
@@ -49,23 +61,23 @@ class Novel:
         return Novel(novel_token, novel_id, base_url)
 
 class Chapter:
-    def __init__(self, entry_url):
-        self.entry_url = entry_url
-        self.first_page = None
+    def __init__(self, name, entry_urls, page_count):
+        self.name = name
+        self.entry_urls = entry_urls
+        self.page_count = page_count
 
-    async def load(self, session):
-        html = await fetch_text_ensure(session, self.entry_url)
+    async def get_page(self, session, page_id):
+        html = await fetch_text_ensure(session, self.entry_urls[page_id])
         doc = parse_html(html)
         js_tags = doc.findall('.//script[@type="text/javascript"]')
         
         params = self.get_params(js_tags)
         if params:
-            self.first_page = first_page = ChapterPage.from_params(params)
+            return ChapterPage.from_params(params)
 
-        urls = await first_page.get_pages(session)
-        
+        '''urls = await first_page.get_pages(session)
         for url in urls:
-            await first_page.download_page(session, url)
+            await first_page.download_page(session, url)'''
 
     def get_params(self, jss):
         for js in jss:

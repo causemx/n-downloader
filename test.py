@@ -13,16 +13,23 @@ async def after():
     print('call is done')
 
 async def read(url):
+    def convert(list):
+        return tuple(i for i in list)
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as r:
             html = await r.text()
             doc = parse_html(html)
+            content = {}
+            urls = []
             for d in doc.iter('li'):
                 if d.text:
-                    print(d.text)
+                    if len(urls) != 0:
+                        content.update({d.text: convert(urls)})
+                        urls.clear()
                 else:
                     a = d.find('.//a[@class="chapter-li-a "]')
-                    print(a.attrib['href'])
+                    urls.append(a.attrib['href'])
+            print(content)
             
 async def check_none_page(url):
     async with aiohttp.ClientSession() as session:
