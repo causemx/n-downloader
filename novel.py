@@ -1,4 +1,5 @@
 import re
+import os
 import asyncio
 import urllib.parse
 from utils import fetch_text_ensure, parse_html
@@ -98,13 +99,12 @@ class ChapterPage:
         self.url_previous = url_previous
         self.url_next = url_next
         self.url_home = url_home
+        self.loaded = False
+        self.ref_urls = []
         
-    
-    async def get_pages(self, session):
+    async def load(self, session):
         #print('chapter_page: start get_pages:{}'.format(url))
-        ref_urls = []
         url = '{}{}/{}/{}.html'.format(self.url_home, "novel", self.articleid, self.chapterid)
-        ref_urls.append(url)
         for i in range(5):
             curr_url = '{}_{}.html'.format(url[:-5], i+1)
             html = await fetch_text_ensure(session, curr_url)
@@ -112,29 +112,29 @@ class ChapterPage:
             ret = doc.find('.//div[@id="acontent"]/p')
             try:
                 if ret.text:
-                    ref_urls.append(curr_url)
+                    self.ref_urls.append(curr_url)
             except AttributeError as e:
                 pass
-        return ref_urls
+        self.loaded = True
 
-    async def download_page(self, session, url):
-        html = await fetch_text_ensure(session, url)
-        doc = parse_html(html)
-
-        f = open("novel.txt", "a+")
-        
-        hs = doc.find('.//div[@class="atitle"]/h1')
-        hss = doc.find('.//div[@class="atitle"]/h3')
-        f.write(hs.text)
-        f.write("\n")
-        f.write(hss.text)
-        f.write("\n")
-        ps = doc.findall('.//div[@id="acontent"]/p')
-        for p in ps:
-            if p.text:
-                f.write(p.text)
-        f.write("\n")
-        f.close()
+    async def download_page(self, session, dest="./"):
+        for url in self.ref_urls:
+            html = await fetch_text_ensure(session, url)
+            doc = parse_html(html)
+            if not os.path.isdir(dest):
+                os.makedirs(dest)
+            f = open("{}/{}".format(dest, self.chapterid), "a+")
+            
+            hs = doc.find('.//div[@class="atitle"]/h1')
+            f.write(hs.text)
+            f.write("\n\n")
+            ps = doc.findall('.//div[@id="acontent"]/p')
+            for p in ps:
+                if p.text:
+                    f.write(p.text)
+            f.write("\n\n")
+            f.close()
+       
 
     @staticmethod
     def get_url(page):
