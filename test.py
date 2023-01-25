@@ -21,15 +21,35 @@ async def read(url):
             doc = parse_html(html)
             content = {}
             urls = []
-            for d in doc.iter('li'):
-                if d.text:
-                    if len(urls) != 0:
-                        content.update({d.text: convert(urls)})
-                        urls.clear()
-                else:
+            header = ""
+            di = doc.iter('li')
+            while True:
+                try:
+                    d = di.__next__()
                     a = d.find('.//a[@class="chapter-li-a "]')
                     urls.append(a.attrib['href'])
+                except AttributeError:
+                    if len(urls) != 0:
+                        content.update({header : convert(urls)}) 
+                        urls.clear()
+                    header = d.text
+                except StopIteration:
+                    pass # reach the end of iterator
+                    content.update({header : convert(urls)})
+                    break
             print(content)
+                
+            '''for d in doc.iter('li'):
+                if d.text:
+                    if len(urls) != 0:
+                        content.update({header : convert(urls)}) 
+                        urls.clear()
+                    header = d.text
+                else: 
+                    a = d.find('.//a[@class="chapter-li-a "]')
+                    if a:
+                        urls.append(a.attrib['href'])
+            print(content)'''
             
 async def check_none_page(url):
     async with aiohttp.ClientSession() as session:

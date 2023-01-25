@@ -23,26 +23,30 @@ class Novel:
         html = await fetch_text_ensure(session, url)
         doc = parse_html(html)
 
+        header = ''
         entries = []
         page_count = 0
 
-        for d in doc.iter('li'):
-            if d.text:
-                if len(entries) != 0:
-                    self.chapters.append(Chapter(d.text, convert(entries), page_count))
-                    entries.clear()
-                    page_count = 0
-            else:
+        di = doc.iter('li')
+        while True:
+            try:
+                d = di.__next__()
                 a = d.find('.//a[@class="chapter-li-a "]')
                 if a.attrib['href'] != 'javascript:cid(0)':
                     entries.append('{}{}'.format(self.base_url, a.attrib['href']))
-                    page_count = page_count + 1
+                page_count = page_count + 1
+            except AttributeError:
+                if len(entries) != 0:
+                    self.chapters.append(Chapter(header, convert(entries), page_count)) 
+                    entries.clear()
+                    page_count = 0
+                header = d.text
+            except StopIteration:
+                pass # reach the end of iterator
+                self.chapters.append(Chapter(header, convert(entries), page_count)) 
+                break
 
-        self.loaded = True
-
-        '''for chapter in chapters:
-            await chapter.load(session)'''
-        
+        self.loaded = True 
 
     def get_url(self):
         url = '{}/{}/{}/catalog'.format(
@@ -68,13 +72,17 @@ class Chapter:
         self.page_count = page_count
 
     async def get_page(self, session, page_id):
-        html = await fetch_text_ensure(session, self.entry_urls[page_id])
-        doc = parse_html(html)
-        js_tags = doc.findall('.//script[@type="text/javascript"]')
-        
-        params = self.get_params(js_tags)
-        if params:
-            return ChapterPage.from_params(params)
+        try:
+            html = await fetch_text_ensure(session, self.entry_urls[page_id])
+            doc = parse_html(html)
+            js_tags = doc.findall('.//script[@type="text/javascript"]')
+            
+            params = self.get_params(js_tags)
+            if params:
+                return ChapterPage.from_params(params)
+        except IndexError:
+            print('entry_url_length:{}, error index:{}'.format(len(self.entry_urls), page_id))
+
 
         '''urls = await first_page.get_pages(session)
         for url in urls:
