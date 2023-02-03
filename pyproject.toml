@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "n-downloader"
+version = "1.0.0"
+description = "Novel downloader from tw.linovelib.com"
+authors = ["Your Name <you@example.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "n_downloader"}]
+
+[tool.poetry.dependencies]
+python = "3.10.6"
+html5lib = "^1.1"
+
+[tool.poetry.group.dev.dependencies]
+aiohttp = "^3.8.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

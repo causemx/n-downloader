@@ -21,6 +21,9 @@ def main(args):
 
     parser_download = subparsers.add_parser('download', help='download images from a gallery')
     parser_download.add_argument('novel_url', type=str, help='Url of the novel that you want to download')
+    parser_download.add_argument('--mode', default='integrated', const='integrated', nargs='?', \
+        choices=['integrated', 'seperated'], help='Producing one page or multiple pages (default: %(default)s)')
+
     parser_download.add_argument('--download-timeout', type=float, dest='download_timeout', default=5.0, \
         help='Timeout of download connections')
     parser_download.set_defaults(func=do_download)
@@ -55,7 +58,7 @@ def main(args):
 
 async def do_download(args):
     #await core.load_preview(args.session, args.catalog_url)
-    await core.download(args.session, args.novel_url)
+    await core.download(args.session, args.novel_url, args.mode)
 
 def prepare_cookies(args):
     path = args.cookie_file_path

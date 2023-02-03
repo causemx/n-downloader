@@ -83,11 +83,6 @@ class Chapter:
         except IndexError:
             print('entry_url_length:{}, error index:{}'.format(len(self.entry_urls), page_id))
 
-
-        '''urls = await first_page.get_pages(session)
-        for url in urls:
-            await first_page.download_page(session, url)'''
-
     def get_params(self, jss):
         for js in jss:
             if js.text is not None and js.text.startswith('var ReadParams'):
@@ -125,13 +120,17 @@ class ChapterPage:
                 pass
         self.loaded = True
 
-    async def download_page(self, session, dest="./"):
+    async def download_page(self, session, mode, dest):
         for url in self.ref_urls:
             html = await fetch_text_ensure(session, url)
             doc = parse_html(html)
             if not os.path.isdir(dest):
                 os.makedirs(dest)
-            f = open("{}/{}".format(dest, self.chapterid), "a+")
+            
+            if mode is 'integrated':
+                f = open("{}/{}.txt".format(dest, 'content'), "a+")
+            elif mode is 'seperated':
+                f = open("{}/{}.txt".format(dest, self.chapterid), "a+")
             
             hs = doc.find('.//div[@class="atitle"]/h1')
             f.write(hs.text)

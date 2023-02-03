@@ -17,9 +17,10 @@ async def do_forever(job):
             logger.error(traceback.format_exc())
 
 class Downloader:
-    def __init__(self, session, novel_url):
+    def __init__(self, session, novel_url, mode):
         self.session = session
         self.novel = Novel.from_url(novel_url)
+        self.mode = mode
         self.queue1 = asyncio.queues.Queue()
     
     async def get_chapt(self):
@@ -27,7 +28,7 @@ class Downloader:
         for id in range(chapter.page_count):
             page = await chapter.get_page(self.session, id)
             await page.load(self.session)
-            await page.download_page(self.session, dest="./novel/{}".format(chapter.name))
+            await page.download_page(self.session, self.mode, dest="./novel/{}".format(chapter.name))
         self.queue1.task_done()
 
     async def start(self):
